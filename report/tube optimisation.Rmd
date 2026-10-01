@@ -18,9 +18,9 @@ library(kableExtra)
 
 The aim of this project is to determine the optimal train allocation across services on the Victoria Line of the London Underground to minimise passenger overcrowding, using TfL NUMBAT data. An integer linear programming model is developed to find the minimum number of trains that can be dispatched in each interval and direction whilst maintaining zero overcrowding. 
 
-The initial model however only minimised overcrowding. A sensitivity analysis, investigbating the effect of a substantial reduction in train capacity revealed a solution where overcrowding was zero could still be found. Therefore the model was revised to minimise train dispatched instead and a sensitivity analysis was performed, investigationg the effect of a decrease in train capacity on the minimum number of trains that can be dispatched so that overcrowding is zero.
+The initial model however only minimised overcrowding. A sensitivity analysis, investigating the effect of a substantial reduction in train capacity revealed a solution where overcrowding was zero could still be found. Therefore the model was revised to minimise train dispatches and a sensitivity analysis was performed, investigating the effect of a decrease in train capacity on the minimum number of trains that can be dispatched, whilst maintaining overcrowding at zero.
 
-The model assumes a fixed number of cars per train and average capacity per car. Trains on the Victoria Line consist of 8 cars with an average capacity per car of 107, so the average capacity per train is calculated to be 856. Additionally the victoria Line fleet size is 47, which is used as a constraint in the model.f
+The model assumes a fixed number of cars per train and average capacity per car. Trains on the Victoria Line consist of 8 cars with an average capacity per car of 107, 856 is assumed to be the average capacity per train. The Victoria Line fleet size is assumed to be 47 trains and is incorporated as a fleet constraint in the model.
 
 ## 2. Data
 
@@ -30,7 +30,7 @@ The model uses data from TfL NUMBAT 2025
 \newline
 <https://crowding.data.tfl.gov.uk/>.
 \newline
-The data on a typical autumn monday (NBT25MON) was chosen, simply due to it being the first day in the week. Link Loads data was used.
+The data on a typical autumn monday (NBT25MON) was chosen and Link Loads data was used.
 
 Information used in determining the model constraints was gathered from the following websites:
 \newline
@@ -42,12 +42,27 @@ Information used in determining the model constraints was gathered from the foll
 
 ### 2.2 Data preparation
 
-In the data preparation phase columns not relevant to the model were dropped and the Victoria Line was selected. Then the data frame was converted to a long format, time intervals were initially arranged in columns but the process converted them to rows. Finally the order link numbers were then adjusted - they were kept the same for NB but reversed for SB as instead of order the numbers were going to be allocated to links. 
+In the data preparation phase columns not relevant to the model were dropped and the Victoria Line was selected. Then the data frame was converted into a long format, time intervals were initially arranged in columns but the process converted them to rows. Finally the order link numbers were then adjusted - they were kept the same for NB but reversed for SB as instead of order the numbers were going to be allocated to links. 
 
+\newpage
 
 ## 3. Mathematical Model
 
-## 3.1 Model 1
+## 3.1 Assumptions
+
+The NUMBAT data used 15 minute intervals, which significantly influenced the design of the model. The travel time between each station is roughly 2 minutes and the total time it takes to reach one end of the line to the other is approximately 31 minutes. However for simplicity this was assumed to be 30 minutes (and therfore 2 intervals). 
+
+The model modeled trains as completing a cycle around the line (starting from one end, reaching the end, turning around and then reaching the other end). However turnaround time was not taken into consideration in the model and it was instead assumed it would take 60 minutes (4 intervals) for a train to complete a full cycle.
+
+To remain consistent with the 15 minute intervals, in each direction the line was split into halves from station. Four trains are assumed to be in circulation at t = 0, one in each half. This was to ensure overcrowding remained at zero at all times.
+
+Additionally it is assumed all trains are identical with a fixed capacity of 856.
+
+Link load was used to determine passenger demand and by setting overcrowding equal to zero, all passenger demand must be accommodated for in each interval.
+
+Finally it is assumed there are no delays or cancellations.
+
+## 3.2 Model 1
 $$
 \text{Let } t = 1,...,T \text{ denote each 15-minute interval}
 $$
@@ -99,7 +114,7 @@ $$
 
 $$
 \text{Minimise } 
-\sum_{d \in \text{{NB,SB}}} 
+\sum_{d \in \{\mathrm{NB}, \mathrm{SB}\}}
 \sum_{i=1}^{15} 
 \sum_t^T O_{i,t}^d
 $$
@@ -113,10 +128,10 @@ The line is split into halves to be compatible with the 15-minute intervals used
 It is also assumes at t = 0 there is one train in circulation in each half of the line in each direction.
 
 $$
-x_t = x_t = 0  \text{ for } t \leq -2
+x_t^{NB} = x_t^{SB} = 0  \text{ for } t \leq -2
 $$
 $$
-x_t = x_t = 1 \text{ for } t \in \{\mathrm{-1}, \mathrm{0}\}
+x_t^{NB} = x_t^{SB} = 1 \text{ for } t \in \{\mathrm{-1}, \mathrm{0}\}
 $$
 
 ### Capacity constraints
@@ -154,7 +169,7 @@ $$
 ### Fleet constraint
 
 $$
-4 + \sum_{\tau = t-3}^t 
+\sum_{\tau = t-3}^t 
 ( x_{\tau}^{NB} + x_{\tau}^{SB} )
 \leq 
 F, 
@@ -176,9 +191,9 @@ $$
 x_t^d \in \mathbb{Z}_{\geq 0}
 $$
 
-## 3.2 Model 2
+## 3.3 Model 2
 
-The second model is very similar, following the same constraints with the addition of overcrowding being set to 0.
+The second model retains the train circulation, fleet and frequency constraints from model 1. However it removes the overcrowding constraint, essentially setting it equal to zero so it requires  passenger demand to be no greater than available capacity.
 
 ### Decision variables
 
@@ -206,17 +221,17 @@ $$
 
 $$
 \text{Minimise } 
-\sum_{d \in \text{{NB,SB}}} 
+\sum_{d \in \{\mathrm{NB}, \mathrm{SB}\}}
 \sum_{t=1}^T x_{t}^d
 $$
 
 ### Constrains
 
 $$
-x_t = x_t = 0  \text{ for } t \leq -2
+x_t^{NB} = x_t^{SB} = 0  \text{ for } t \leq -2
 $$
 $$
-x_t = x_t = 1 \text{ for } t \in \{\mathrm{-1}, \mathrm{0}\}
+x_t^{NB} = x_t^{SB} = 1 \text{ for } t \in \{\mathrm{-1}, \mathrm{0}\}
 $$
 $$
 L_{i,t}^{NB} \leq c(x_t^{NB} + x_{t-2}^{SB})
@@ -232,7 +247,7 @@ L_{i,t}^{SB} \leq c(x_{t}^{SB} + x_{t-2}^{NB})
 $$
 $$
 L_{i,t}^{SB} \leq c(x_{t-1}^{SB} + x_{t-3}^{NB})
-\text{ }, \forall (i \geq 8 \cap  \text{ } t >3)
+\text{ }, \forall (i \leq 8 \cap  \text{ } t >3)
 $$
 $$
 4 + \sum_{\tau = t-3}^t 
@@ -254,7 +269,9 @@ $$
 
 ## 4. Optimisation Approach
 
-The model was implented in Python using Pyomo and solved using GPLK at first and then HiGHS when a more powerful solver was needed. The initial model was implemented and a solution where overcrowding equaled zero was found for the intial capacity of 856. However after adjusting the capacity down to even 428, the model still found a solution where overcrowding was equal to zero. Therefore the model was instead adjusted to minimise the trains dispatches needed for overcrowding to remain at zero. 
+The model was implemented in Python using Pyomo and solved using GLPK for the first model. However the solution time became impractical for the second model so HiGHS was used instead. The initial model was implemented and a solution where overcrowding equaled zero was found for the baseline capacity of 856. However after adjusting the capacity down to even 428, the model still found a solution where overcrowding was equal to zero. Therefore the model was instead adjusted to minimise the trains dispatches needed for overcrowding to remain at zero. 
+
+\newpage
 
 ## 5. Results
 
@@ -265,8 +282,9 @@ schedule <- read_csv("~/Tube service optimisation/data/processed/Optimised_m2_re
                      show_col_types = FALSE)
 
 kable(head(schedule, 15),
-      caption = "Snippet of dataframe produced")
+      caption = "First 15 intervals of the optimised train dispatch schedule at capacity 856")
 ```
+
 
 ```{r, echo=FALSE}
 vic_mon <- read_csv("~/Tube service optimisation/data/processed/Optimised_m2_results.csv", 
@@ -334,7 +352,7 @@ ggplot(dispatch, aes(x = t, y = Trains_Dispatched,
 
 
 ```
-
+The plot shows the optimised number of trains in circulation in each 15 minute interval (assuming capacity is 856). The number of trains being dispatched fluctuates, although the number of trains in circulation increases to meet peak demand in the morning. The number of active trains peaks around 08:00/08:30 at 23 in circulation. After the initial rush, link load falls so the number of trains being dispatched during each interval falls and so does the number of active trains decreasing. The  number of active trains continues to fall until just after 12:30, where it remains at 8 trains active on he line until just before 15:00. From this point the number of trains dispatched in both directions increases and the number of trains in circulation increases and peaks at 24 at around 17:00, and begins to fall again at around 19:00. The numberd of active trains continues to fall until just after 20:00, when it then plateaus at 8 in circulation, then falling again after 22:30, eventually falling to 0 after 01:00 in the morning. It can be seen that more trains are dispatched on the Southbound line, especially during peak times. Additionally it it only after 20:00 that during some intervals no trains are dispatched on the Southbound line (with the exception of the first two interval after 05:00). However on the Northbound line between the rough hours of 11:00 and 14:30 no trains are dispatched.
 
 
 ## 6. Sensitivity Analysis
@@ -357,11 +375,12 @@ ggplot(min_total, aes(x = Capacity, y = Minimised_trains,
        x = "Train Capacity", y = "Total Trains Dispatched") +
   theme_minimal()
 ```
-
+The plot suggests as capacity falls, the number of trains dispatched must rise in order to meet the constraint of zero overcrowding. At capacity 856, used in the model, the total number of trains dispatched was just below 250. But when capacity is reduced by 50% to 428 the total number of trains dispatched is just below 450 (an increase of around 200). Each time capacity is decreased by 12% the increase in the total number of dispatched trains rises slightly more. For example the increase in train dispatches when capacity decreases from 535 to 428 in much larger than the increase in trains when capacity is decreased from 856 to 749.
 
 ### 6.2 Effect on fleet utilisation
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.width=7.5, fig.height=10}
+
 vic_mon <- read_csv("~/Tube service optimisation/data/processed/Sensitivity_m2.csv",
                     show_col_types = FALSE)
 
@@ -387,27 +406,6 @@ vic_mon$Start_Time <- paste0(
 
 vic_mon$Capacity <- as.character(vic_mon$Capacity)
 
-# Plot trains active for each interval, split by capacity
-
-ggplot(vic_mon, aes(x = t, 
-                    y = Trains_active,
-                    group = Capacity, 
-                    colour = Capacity)) + 
-  geom_step(linewidth = 1) + 
-  geom_point(size = 1) + 
-  labs(
-    title = "Minimised Active Trains for each Capacity and Interval",
-    x = "Time",
-    y = "Number of Trains Active"
-  ) +
-  scale_x_continuous(breaks = vic_mon$t[seq(1, nrow(vic_mon), by = 80)],
-                     labels = vic_mon$Start_Time[seq(1, nrow(vic_mon), by = 80)]) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(face = "bold")
-  )
-```
-```{r, echo=FALSE}
 # Dispatch schedule for selected capacities
 
 #df for direction
@@ -437,18 +435,18 @@ plot_capacity <- function(capacity) {
                                  y = Trains_active,
                                  colour = "Active Trains"),
               inherit.aes = FALSE,
-              linewidth = 0.5
-    ) + geom_point(data = plot_data2, size = 0.5, inherit.aes = FALSE,
+              linewidth = 1
+    ) + geom_point(data = plot_data2, size = 1, inherit.aes = FALSE,
                    aes(x = t,
                        y = Trains_active,
                        colour = "Active Trains")) + 
-    scale_x_continuous(breaks = plot_data2$t[seq(1, nrow(plot_data2), by = 60)],
-                       labels = plot_data2$Start_Time[seq(1, nrow(plot_data2), by = 60)]
+    scale_x_continuous(breaks = plot_data2$t[seq(1, nrow(plot_data2), by = 20)],
+                       labels = plot_data2$Start_Time[seq(1, nrow(plot_data2), by = 20)]
     ) +
+    scale_y_continuous(limits = c(0, 50), breaks = seq(0,50, 10)) +
     theme_minimal() + 
     labs(
-      title = paste("Optimised Train Dispatches
-                    at capacity", capacity),
+      title = paste("Optimised Train Dispatches at capacity", capacity),
       x = "15 minute interval",
       y = "Number of Trains") +
     theme(
@@ -461,11 +459,49 @@ p2 <- plot_capacity(749)
 p3 <- plot_capacity(642)
 p4 <- plot_capacity(428)
 
-combined_plot <- p1 + p2 + p3 + p4
+combined1 <- p1 / p2
 
-combined_plot
+combined2 <- p3 / p4
+
 ```
 
+```{r, echo=FALSE, fig.width=7.5, fig.height=10}
+combined1
+```
+
+```{r, echo=FALSE, fig.width=7.5, fig.height=10}
+combined2
+```
+
+```{r, echo=FALSE}
+
+# Plot trains active for each interval, split by capacity
+
+ggplot(vic_mon, aes(x = t, 
+                    y = Trains_active,
+                    group = Capacity, 
+                    colour = Capacity)) + 
+  geom_step(linewidth = 1) + 
+  geom_point(size = 1) + 
+  labs(
+    title = "Minimised Active Trains for each Capacity and Interval",
+    x = "Time",
+    y = "Number of Trains Active"
+  ) +
+  scale_x_continuous(breaks = vic_mon$t[seq(1, nrow(vic_mon), by = 80)],
+                     labels = vic_mon$Start_Time[seq(1, nrow(vic_mon), by = 80)]) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold"),
+    legend.position = "top"
+  )
+```
+
+The first four plots show the number of active trains and trains dispatched in each direction across the capacities 856, 749, 642, 428. Meanwhile the plot below shows the number of active trains in each interval for the chosen capacities on one plot, providing a more direct comparison.
+
+The plots show a steeper increase in active trains during peak times for the lower capacities. The individual plots also highlight how for the lower capacities a greater number of trains need to be dispatched in order to meet the increased passenger demand. For example at capacity 428 there are several intervals where 9 trains are dispatched in one direction (primarily SB) whilst the maximum number of trains dispatched in one direction during one interval for capacity 856 is 6. Even betweeen peak times, the number of active trains is greater at lower capacities (at capacity 428 it falls to 16 but at capacity 856 it falls to 8).
+
+However across the different capacities, the same pattern of the number of active trains peaking during peak times in the morning and evening can be observed, since they are all responding to the same link load data. The key difference is that at lower capacities a greater number of trains must be dispatched in order to meet this demand.
 
 ## 7. Limitations
 
